@@ -1,0 +1,28 @@
+# Core Dependencies
+torch>=2.0.0
+numpy>=1.24.0
+gymnasium>=0.29.0
+
+# Multi-Agent RL Environment
+pettingzoo>=1.24.0
+pygame>=2.1.0  # Required for PettingZoo rendering
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Utilities
+tqdm>=4.65.0
+
+# Optional: For using Stable-Baselines3 (if needed)
+# stable-baselines3>=2.0.0
+
+# Optional: For using RLlib (if needed)
+# ray[rllib]>=2.7.0
+# tensorflow>=2.13.0  # or tensorflow-probability
+
+# Development Tools (optional)
+# jupyter>=1.0.0
+# ipython>=8.12.0
+# tensorboard>=2.13.0
+
