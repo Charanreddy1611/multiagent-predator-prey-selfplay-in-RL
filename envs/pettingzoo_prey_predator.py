@@ -1,61 +1,68 @@
 """
-Wrapper for PettingZoo's Simple Tag Environment.
-This provides a standardized interface for the predator-prey game.
+Custom Predator-Prey Environment.
+Replaced PettingZoo with custom implementation due to:
+- Moving obstacles issue
+- Collision detection problems
+- Better control over game mechanics
 """
 
-from pettingzoo.mpe import simple_tag_v3
+from envs.custom_predator_prey import CustomPredatorPreyEnv
 from typing import Optional, Dict, Any
 import numpy as np
 
 
 class SimpleTagEnv:
     """
-    Wrapper for PettingZoo's Simple Tag environment.
+    Custom predator-prey environment.
     
-    In Simple Tag:
-    - Adversaries (predators) try to tag good agents (prey)
-    - Good agents try to avoid being tagged
-    - Environment includes landmarks and continuous actions
+    Features:
+    - Fixed obstacles (non-moving)
+    - Clear collision detection
+    - Discrete grid world
+    - Configurable capture radius
+    - Better control over game mechanics
     """
     
     def __init__(
         self,
-        n_adversaries: int = 3,
-        n_good: int = 1,
+        n_adversaries: int = 2,
+        n_good: int = 2,
         max_cycles: int = 200,
+        grid_size: int = 20,
         render_mode: Optional[str] = None,
     ):
         """
-        Initialize Simple Tag environment.
+        Initialize custom predator-prey environment.
         
         Args:
             n_adversaries: Number of adversaries (predators)
             n_good: Number of good agents (prey)
             max_cycles: Maximum steps per episode
-            render_mode: Rendering mode ("human", "rgb_array", or None)
+            grid_size: Size of grid (default 20×20)
+            render_mode: Rendering mode ("human" or None)
         """
         self.n_adversaries = n_adversaries
         self.n_good = n_good
         self.max_cycles = max_cycles
         self.render_mode = render_mode
+        self.grid_size = grid_size
         
-        # Create the PettingZoo environment
-        self.env = simple_tag_v3.parallel_env(
-            num_good=n_good,
-            num_adversaries=n_adversaries,
-            num_obstacles=2,
-            max_cycles=max_cycles,
-            continuous_actions=False,  # Use discrete actions
-            render_mode=render_mode
+        # Create the custom environment
+        self.env = CustomPredatorPreyEnv(
+            grid_size=grid_size,
+            n_predators=n_adversaries,
+            n_prey=n_good,
+            n_obstacles=2,
+            max_steps=max_cycles,
+            agent_radius=0.5,      # Same size for predators and prey
+            obstacle_radius=1.0,   # Double the agent size
+            capture_radius=1.5,    # Distance to catch
+            tag_reward=10.0        # Symmetric reward magnitude
         )
         
         # Get agent lists
-        self.env.reset()
-        self.possible_agents = self.env.possible_agents
-        
-        # Separate adversaries and good agents
-        self.adversaries = [agent for agent in self.possible_agents if 'adversary' in agent]
-        self.good_agents = [agent for agent in self.possible_agents if 'agent' in agent]
+        self.adversaries = self.env.adversaries
+        self.good_agents = self.env.good_agents
         
         # For compatibility with training scripts
         self.predators = self.adversaries  # Alias
@@ -65,7 +72,7 @@ class SimpleTagEnv:
         
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         """Reset the environment."""
-        observations, infos = self.env.reset(seed=seed, options=options)
+        observations, infos = self.env.reset(seed=seed)
         self.agents = self.env.agents.copy()
         return observations, infos
     
@@ -77,7 +84,7 @@ class SimpleTagEnv:
     
     def render(self):
         """Render the environment."""
-        if self.render_mode is not None:
+        if self.render_mode == "human":
             return self.env.render()
     
     def close(self):

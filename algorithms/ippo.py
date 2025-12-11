@@ -64,12 +64,13 @@ class IPPO:
         obs_dim: int,
         action_dim: int,
         n_agents: int,
-        lr: float = 3e-4,
-        gamma: float = 0.99,
-        clip_param: float = 0.2,
-        value_coef: float = 0.5,
-        entropy_coef: float = 0.01,
-        max_grad_norm: float = 0.5,
+        lr: float = 5e-4,  # Optimized: increased from 3e-4
+        gamma: float = 0.98,  # Optimized: reduced from 0.99
+        clip_param: float = 0.3,  # Optimized: increased from 0.2
+        value_coef: float = 1.0,  # Optimized: increased from 0.5
+        entropy_coef: float = 0.05,  # Optimized: increased from 0.01
+        max_grad_norm: float = 1.0,  # Optimized: increased from 0.5
+        hidden_dim: int = 256,  # Optimized: increased from 128
         device: str = "cpu"
     ):
         """
@@ -79,12 +80,13 @@ class IPPO:
             obs_dim: Observation dimension
             action_dim: Action dimension
             n_agents: Number of agents
-            lr: Learning rate
-            gamma: Discount factor
-            clip_param: PPO clipping parameter
-            value_coef: Value loss coefficient
-            entropy_coef: Entropy bonus coefficient
-            max_grad_norm: Maximum gradient norm
+            lr: Learning rate (default: 5e-4, optimized for Simple Tag)
+            gamma: Discount factor (default: 0.98)
+            clip_param: PPO clipping parameter (default: 0.3)
+            value_coef: Value loss coefficient (default: 1.0)
+            entropy_coef: Entropy bonus coefficient (default: 0.05)
+            max_grad_norm: Maximum gradient norm (default: 1.0)
+            hidden_dim: Hidden layer dimension (default: 256)
             device: Device for computation
         """
         self.n_agents = n_agents
@@ -95,9 +97,9 @@ class IPPO:
         self.max_grad_norm = max_grad_norm
         self.device = device
         
-        # Create independent actor-critic for each agent
+        # Create independent actor-critic for each agent with optimized hidden dimension
         self.agent_networks = [
-            ActorCritic(obs_dim, action_dim).to(device) for _ in range(n_agents)
+            ActorCritic(obs_dim, action_dim, hidden_dim).to(device) for _ in range(n_agents)
         ]
         
         # Optimizers
@@ -124,8 +126,12 @@ class IPPO:
                 obs[i], actions[i], rewards[i], next_obs[i], dones[i]
             ))
     
-    def update(self, n_epochs: int = 4):
-        """Update each agent's policy independently."""
+    def update(self, n_epochs: int = 10):
+        """Update each agent's policy independently.
+        
+        Args:
+            n_epochs: Number of update epochs (default: 10, optimized from 4)
+        """
         total_losses = {"actor_loss": 0, "critic_loss": 0, "entropy": 0}
         
         for agent_id in range(self.n_agents):

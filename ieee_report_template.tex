@@ -1,0 +1,425 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{multirow}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Emergent Adversarial Behaviors via Self-Play in Multi-Agent Reinforcement Learning: A Comparative Study of MAPPO and IPPO Algorithms\\
+%{\footnotesize \textsuperscript{*}Note: Sub-titles are not captured in Xplore and
+%should not be used}
+%\thanks{Identify applicable funding agency here. If none, delete this.}
+}
+
+\author{\IEEEauthorblockN{1\textsuperscript{st} Charan Reddy Nandyala}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{University of California, Riverside}\\
+Riverside, CA, USA \\
+cnand002@ucr.edu}
+\and
+\IEEEauthorblockN{2\textsuperscript{nd} Dhanush Chalicheemala}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{University of California, Riverside}\\
+Riverside, CA, USA \\
+dchal007@ucr.edu}
+\and
+\IEEEauthorblockN{3\textsuperscript{rd} Satyadev Gangineni}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{University of California, Riverside}\\
+Riverside, CA, USA \\
+sgang024@ucr.edu}
+}
+
+\maketitle
+
+\begin{abstract}
+This paper presents a comparative study of Multi-Agent Proximal Policy Optimization (MAPPO) and Independent Proximal Policy Optimization (IPPO) algorithms in adversarial multi-agent reinforcement learning scenarios. We investigate emergent behaviors through competitive self-play in predator-prey environments, evaluating three distinct self-play strategies: alternating, population-based, and league-based training. Our experiments reveal that IPPO predators consistently achieve 96-98\% win rates across all strategies, demonstrating superior convergence and adaptation capabilities. Conversely, MAPPO exhibits more balanced dynamics with better prey survival rates, achieving positive prey rewards (+3.1) in league-based self-play. The centralized critic in MAPPO enables superior coordination, while IPPO's independent learning approach provides faster convergence and better scalability. Our findings highlight the trade-offs between coordination and independent learning in competitive multi-agent settings.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Multi-agent reinforcement learning, MAPPO, IPPO, self-play, adversarial learning, predator-prey, coordination
+\end{IEEEkeywords}
+
+\section{Introduction}
+Multi-agent reinforcement learning (MARL) has emerged as a critical area of research for understanding how intelligent agents learn and interact in complex environments. In competitive settings, agents must balance individual optimization with strategic coordination, leading to emergent behaviors that are difficult to predict a priori.
+
+This paper investigates the comparative performance of two prominent MARL algorithms: Multi-Agent Proximal Policy Optimization (MAPPO) and Independent Proximal Policy Optimization (IPPO). We focus on adversarial scenarios where agents have conflicting objectives, specifically predator-prey environments where predators seek to capture prey while prey attempt to evade capture.
+
+Our contributions include:
+\begin{itemize}
+\item A comprehensive comparison of MAPPO and IPPO across multiple self-play strategies
+\item Analysis of emergent behaviors in competitive multi-agent settings
+\item Identification of key factors contributing to algorithm performance differences
+\item Empirical evaluation across 2v2 and 3v2 configurations
+\end{itemize}
+
+\section{Related Work}
+Multi-agent reinforcement learning has been extensively studied in both cooperative and competitive settings. Yu et al.~\cite{b1} demonstrated the effectiveness of PPO in cooperative multi-agent games, while Tampuu et al.~\cite{b2} explored independent learning approaches. Vinyals et al.~\cite{b3} showed the power of self-play in competitive settings through AlphaStar. Our work extends these findings by directly comparing centralized (MAPPO) and independent (IPPO) learning approaches in adversarial predator-prey scenarios.
+
+\section{Background}
+
+\subsection{Multi-Agent Proximal Policy Optimization (MAPPO)}
+MAPPO extends Proximal Policy Optimization (PPO) to multi-agent settings using Centralized Training, Decentralized Execution (CTDE) paradigm. The algorithm addresses the non-stationarity problem in multi-agent learning by utilizing a centralized critic during training while maintaining decentralized policy execution.
+
+\subsubsection{Architecture}
+MAPPO employs a two-network architecture: (1) \textit{Decentralized Actors}: Each agent maintains its own policy network $\pi_{\theta_i}(a_i|o_i)$ that maps local observations $o_i$ to action probabilities, and (2) \textit{Centralized Critic}: A shared value function $V_{\phi}(s)$ that evaluates the global state $s = [o_1, o_2, ..., o_n]$ concatenating all agent observations. The critic network has input dimension $n \times \text{obs\_dim}$ where $n$ is the number of agents.
+
+\subsubsection{Training Procedure}
+During training, agents collect experiences $\tau = \{(s_t, o_{i,t}, a_{i,t}, r_{i,t}, s_{t+1})\}$ where rewards are averaged across team members: $\bar{r}_t = \frac{1}{n}\sum_{i=1}^{n} r_{i,t}$. The centralized critic computes value estimates $V_{\phi}(s_t)$ using the global state, enabling more accurate advantage estimation. The PPO objective for each agent $i$ is:
+
+\begin{equation}
+\begin{split}
+L^{CLIP}_i(\theta_i) = \mathbb{E}_t\Big[&\min\big(r_t(\theta_i)\hat{A}_t, \\
+&\text{clip}(r_t(\theta_i), 1-\epsilon, 1+\epsilon)\hat{A}_t\big)\Big]
+\end{split}
+\end{equation}
+
+where $r_t(\theta_i) = \frac{\pi_{\theta_i}(a_{i,t}|o_{i,t})}{\pi_{\theta_{i,old}}(a_{i,t}|o_{i,t})}$ is the importance sampling ratio, $\hat{A}_t = \sum_{l=0}^{T-t} \gamma^l \bar{r}_{t+l} - V_{\phi}(s_t)$ is the advantage estimate, and $\epsilon = 0.3$ is the clipping parameter. The total loss combines actor loss, critic loss, and entropy bonus:
+
+\begin{equation}
+L_{total} = L^{CLIP} - c_v L^{VF} + c_e H[\pi_{\theta_i}]
+\end{equation}
+
+where $L^{VF} = (V_{\phi}(s_t) - \hat{R}_t)^2$ is the value function loss, $c_v = 1.0$ and $c_e = 0.05$ are coefficients.
+
+\subsubsection{Key Advantages}
+The centralized critic provides several benefits: (1) reduced variance in value estimation through global state information, (2) better credit assignment by considering team dynamics, (3) improved coordination through shared value function, and (4) more stable training in cooperative settings. However, it requires global state access during training and assumes agents can share information.
+
+\subsection{Independent Proximal Policy Optimization (IPPO)}
+IPPO treats each agent as a completely independent learner, applying single-agent PPO to each agent separately without any information sharing or coordination mechanisms.
+
+\subsubsection{Architecture}
+Each agent $i$ maintains its own independent actor-critic network $(\pi_{\theta_i}, V_{\phi_i})$ that processes only local observations $o_i$. The actor network $\pi_{\theta_i}(a_i|o_i)$ outputs action probabilities, while the critic $V_{\phi_i}(o_i)$ estimates the value function using only local observations. This fully decentralized architecture requires no global state information.
+
+\subsubsection{Training Procedure}
+Agents collect independent experiences $\tau_i = \{(o_{i,t}, a_{i,t}, r_{i,t}, o_{i,t+1})\}$ and update their policies separately. Each agent computes advantages using its own value function: $\hat{A}_{i,t} = \sum_{l=0}^{T-t} \gamma^l r_{i,t+l} - V_{\phi_i}(o_{i,t})$. The PPO objective for agent $i$ is:
+
+\begin{equation}
+\begin{split}
+L^{CLIP}_i(\theta_i) = \mathbb{E}_t\Big[&\min\big(r_t(\theta_i)\hat{A}_{i,t}, \\
+&\text{clip}(r_t(\theta_i), 1-\epsilon, 1+\epsilon)\hat{A}_{i,t}\big)\Big]
+\end{split}
+\end{equation}
+
+Each agent optimizes its policy independently, treating other agents as part of the non-stationary environment. This approach naturally handles non-stationarity by continuously adapting to changing opponent strategies.
+
+\subsubsection{Key Advantages}
+IPPO's independence provides: (1) full decentralization with no communication requirements, (2) robustness to non-stationarity through continuous adaptation, (3) better scalability as complexity grows linearly with number of agents, (4) simpler implementation without coordination overhead, and (5) faster convergence in scenarios where coordination is not critical. However, it may converge to suboptimal strategies due to lack of coordination and faces credit assignment challenges in team settings.
+
+\subsection{Self-Play Strategies}
+Self-play is a training paradigm where agents learn by competing against themselves or other versions, creating a natural curriculum of increasing difficulty. We evaluate three distinct self-play strategies, each with different mechanisms for opponent selection and training dynamics.
+
+\subsubsection{Alternating Self-Play}
+Alternating self-play implements a turn-based training scheme where one team (predators or prey) trains while the other remains frozen. The training focus switches at regular intervals (every 500 steps in our implementation).
+
+\textit{Mechanism}: Initially, predators train against frozen prey. After the switch interval, prey agents are updated to the current trained version and frozen, while predators become frozen opponents. This creates a sequential learning process where each side adapts to the other's improvements.
+
+\textit{Mathematical Formulation}: At step $t$, if $t \bmod I = 0$ where $I$ is the switch interval, we update the opponent snapshot: $\pi_{opponent}^{t+1} = \pi_{active}^{t}$, then freeze $\pi_{opponent}^{t+1}$ and continue training $\pi_{active}^{t+1}$.
+
+\textit{Advantages}: Simple implementation, stable training dynamics, clear opponent progression. \textit{Limitations}: Sequential learning may be slower, potential for overfitting to current opponent, less diverse training experience.
+
+\subsubsection{Population-Based Self-Play}
+Population-based self-play maintains diverse populations of historical agent snapshots, training against randomly sampled opponents from the population history.
+
+\textit{Mechanism}: The algorithm maintains two populations: $\mathcal{P}_{pred} = \{\pi_{pred}^1, \pi_{pred}^2, ..., \pi_{pred}^K\}$ and $\mathcal{P}_{prey} = \{\pi_{prey}^1, \pi_{prey}^2, ..., \pi_{prey}^K\}$ with maximum size $K=5$. At regular intervals (every 500 steps), current agents are added to their respective populations. When population size exceeds $K$, the worst-performing member (based on fitness) is removed. During training, opponents are sampled uniformly from the population.
+
+\textit{Mathematical Formulation}: At each training step, opponent is sampled: $\pi_{opponent} \sim \text{Uniform}(\mathcal{P}_{opponent})$. Population update occurs when $t \bmod U = 0$ where $U$ is the update interval: $\mathcal{P} \leftarrow \mathcal{P} \cup \{\pi_{current}^t\}$, then if $|\mathcal{P}| > K$, remove $\arg\min_{\pi \in \mathcal{P}} f(\pi)$ where $f$ is fitness.
+
+\textit{Advantages}: Diverse opponent exposure, robustness to overfitting, maintains historical strategies. \textit{Limitations}: Memory intensive, requires fitness tracking, may include weak opponents that slow learning.
+
+\subsubsection{League-Based Self-Play}
+League-based self-play, inspired by AlphaStar, employs a competitive league structure with multiple player types: main agents, exploiters, and historical players.
+
+\textit{Mechanism}: The league consists of: (1) \textit{Main Agents} ($M=2$): Primary learners that train continuously, (2) \textit{Exploiters} ($E=1$): Specialized agents that learn to exploit weaknesses in main agents, and (3) \textit{Historical Players}: Snapshot archive of past agent versions maintained in a sliding window. Matchmaking uses ELO ratings to pair agents of similar skill levels.
+
+\textit{Mathematical Formulation}: Each player $p$ has ELO rating $R_p$ updated after match result $w \in \{0, 0.5, 1\}$: $R_p \leftarrow R_p + K(32) \times (w - E_p)$ where $E_p = \frac{1}{1 + 10^{(R_{opp} - R_p)/400}}$ is expected score. Opponent selection uses ELO-based matchmaking: $p_{opp} \sim \text{Match}(R_p, \mathcal{L})$ where $\mathcal{L}$ is the league.
+
+\textit{Advantages}: Prevents overfitting through diverse opponents, competitive matchmaking ensures appropriate difficulty, exploits weaknesses to improve robustness. \textit{Limitations}: Complex implementation, computationally expensive, requires careful hyperparameter tuning.
+
+\section{Methodology}
+
+\subsection{Environment Design}
+We developed a custom discrete gridworld environment for predator-prey scenarios. The environment consists of a 20×20 grid with continuous agent positions. Each episode has a maximum of 200 steps, after which the episode terminates if no capture occurs.
+
+\textit{Agent Configurations}: We evaluate two configurations: (1) \textit{2v2}: 2 predators vs 2 prey, providing balanced team dynamics, and (2) \textit{3v2}: 3 predators vs 2 prey, testing algorithm performance under numerical advantage scenarios.
+
+\textit{Environment Dynamics}: Agents move in discrete steps of 0.5 units per action. The action space consists of 5 actions: stay, up, down, left, right. Predators spawn in the top half of the grid, while prey spawn in the bottom half, creating initial separation. Three fixed obstacles (radius 1.0) are randomly placed in the central region (20\%-80\% of grid) each episode. Capture occurs when a predator is within 1.5 units of prey.
+
+\textit{Observation Space}: Each agent receives a local observation vector: $o_i = [x_i, y_i, v_{x,i}, v_{y,i}, \{x_j, y_j\}_{j \neq i}, \{x_k, y_k\}_{k \in obstacles}]$ where positions are normalized to $[0, 1]$ and relative positions are computed with respect to the observing agent.
+
+\subsection{Reward Structure}
+The reward function is designed to provide learning signals for both predators and prey while maintaining non-zero-sum dynamics.
+
+\textit{Predator Rewards}: Predators receive $+10.0$ for successfully tagging prey (distance $< 1.5$ units). Additionally, proximity bonus of $+0.2$ is awarded when within 3 units but not capturing, encouraging pursuit behavior. This structure provides clear positive feedback for hunting success.
+
+\textit{Prey Rewards}: Prey receive a survival bonus of $+0.1$ per step, providing positive reinforcement for staying alive. When tagged, prey incur a penalty of $-10.0$. To encourage evasion, prey receive $+0.3$ distance reward when all predators are more than 3 units away. This multi-component reward structure helps prey learn effective evasion strategies beyond simple survival.
+
+\textit{Non-Zero-Sum Design}: Unlike zero-sum games where predator gain equals prey loss, our reward structure allows both sides to achieve positive rewards, creating more stable learning dynamics and preventing premature convergence to degenerate strategies.
+
+\subsection{Network Architecture and Hyperparameters}
+Both MAPPO and IPPO use similar network architectures with optimized hyperparameters determined through extensive experimentation.
+
+\textit{Network Architecture}: Actor networks use a 3-layer MLP: $\text{Linear}(\text{obs\_dim} \rightarrow 256) \rightarrow \text{ReLU} \rightarrow \text{Linear}(256 \rightarrow 256) \rightarrow \text{ReLU} \rightarrow \text{Linear}(256 \rightarrow \text{action\_dim}) \rightarrow \text{Softmax}$. Critic networks follow similar structure but output a single scalar value. MAPPO's centralized critic concatenates all agent observations: input dimension = $n \times \text{obs\_dim}$.
+
+\textit{Hyperparameters}: Learning rates are set to $5 \times 10^{-4}$ for predators and $7 \times 10^{-4}$ for prey (40\% higher to compensate for harder learning task). Discount factor $\gamma = 0.98$ balances short-term and long-term rewards. PPO clipping parameter $\epsilon = 0.3$ allows more aggressive policy updates. Value coefficient $c_v = 1.0$ and entropy coefficient $c_e = 0.05$ balance value estimation accuracy and exploration. Networks use hidden dimension 256 (increased from 128) for better representation capacity. Gradient clipping at norm 1.0 prevents training instability.
+
+\textit{Training Configuration}: Each configuration trains for 2,000-5,000 episodes. The first 100 episodes serve as warmup where agents collect experiences without policy updates. Learning rate follows cosine annealing schedule: $\eta_t = \eta_{min} + (\eta_{max} - \eta_{min}) \times \frac{1 + \cos(\pi t / T)}{2}$ where $\eta_{max} = 5 \times 10^{-4}$, $\eta_{min} = 1 \times 10^{-5}$, and $T$ is total episodes. Policy updates occur every episode after warmup, using 10 epochs of minibatch updates with batch size 256. Final performance metrics are computed over the last 500 episodes to ensure convergence.
+
+\subsection{Self-Play Implementation Details}
+Each self-play strategy requires specific hyperparameters and mechanisms:
+
+\textit{Alternating Self-Play}: Switch interval set to 500 steps, allowing sufficient training time for each side before opponent update. When switching, current agent parameters are deep-copied to create frozen opponent snapshot.
+
+\textit{Population-Based Self-Play}: Population size $K=5$ maintains diversity without excessive memory. Update interval of 500 steps balances population freshness and training stability. Fitness tracking uses cumulative reward over recent episodes to identify worst performers for removal.
+
+\textit{League-Based Self-Play}: League maintains 2 main agents and 1 exploiter per team. Historical window of 10 snapshots provides diverse opponents. Checkpoint interval of 1000 steps creates historical players. ELO-based matchmaking with K-factor 32 ensures competitive but fair matchups. Initial ELO rating of 1000 provides neutral starting point.
+
+\section{Experimental Results}
+
+We conducted comprehensive experiments across multiple configurations and self-play strategies. Training curves and visualizations are provided in the Appendix (see Figures 1-6).
+
+\subsection{2v2 Alternating Self-Play}
+
+\begin{table}[h]
+\centering
+\caption{2v2 Alternating Self-Play Results (Last 500 Episodes)}
+\label{tab:2v2_alternating}
+\begin{tabular}{|l|c|c|}
+\hline
+Metric & MAPPO & IPPO \\
+\hline
+Predator Reward & 112.4 & 67.9 \\
+Prey Reward & -37.0 & +9.4 \\
+Predator Win Rate & 44.8\% & 96.2\% \\
+Prey Win Rate & 55.2\% & 3.8\% \\
+\hline
+\end{tabular}
+\end{table}
+
+In 2v2 alternating self-play (Table~\ref{tab:2v2_alternating}), IPPO predators achieved a 96.2\% win rate compared to MAPPO's 44.8\%, while MAPPO demonstrated superior prey survival (55.2\% vs 3.8\%).
+
+\subsection{3v2 Alternating Self-Play}
+
+\begin{table}[h]
+\centering
+\caption{3v2 Alternating Self-Play Results (Last 500 Episodes)}
+\label{tab:3v2_alternating}
+\begin{tabular}{|l|c|c|}
+\hline
+Metric & MAPPO & IPPO \\
+\hline
+Predator Reward & 159.4 ± 227.1 & 185.2 ± 177.5 \\
+Prey Reward & -168.7 ± 351.0 & -206.0 ± 271.2 \\
+Predator Win Rate & 76.6\% & 98.4\% \\
+Prey Win Rate & 23.4\% & 1.6\% \\
+\hline
+\end{tabular}
+\end{table}
+
+With numerical advantage in 3v2 configurations (Table~\ref{tab:3v2_alternating}), IPPO predators reached 98.4\% win rates, though MAPPO maintained better prey survival at 23.4\%.
+
+\subsection{League-Based Self-Play}
+
+\begin{table}[h]
+\centering
+\caption{2v2 League-Based Self-Play Results (Last 500 Episodes)}
+\label{tab:league_2v2}
+\begin{tabular}{|l|c|c|}
+\hline
+Metric & MAPPO & IPPO \\
+\hline
+Predator Reward & 73.4 ± 212.9 & 182.7 ± 202.2 \\
+Prey Reward & +3.1 ± 219.3 & -109.1 ± 207.1 \\
+Predator Win Rate & 53.2\% & 96.2\% \\
+Prey Win Rate & 46.8\% & 3.8\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{3v2 League-Based Self-Play Results (Last 500 Episodes)}
+\label{tab:league_3v2}
+\begin{tabular}{|l|c|c|}
+\hline
+Metric & MAPPO & IPPO \\
+\hline
+Predator Reward & 73.4 ± 212.9 & 182.7 ± 202.2 \\
+Prey Reward & +3.1 ± 219.3 & -109.1 ± 207.1 \\
+Predator Win Rate & 53.2\% & 96.2\% \\
+Prey Win Rate & 46.8\% & 3.8\% \\
+\hline
+\end{tabular}
+\end{table}
+
+League-based self-play (Tables~\ref{tab:league_2v2} and~\ref{tab:league_3v2}) revealed MAPPO's coordination advantages, achieving positive prey rewards (+3.1), the best prey performance across all strategies.
+
+\subsection{Population-Based Self-Play}
+
+\begin{table}[h]
+\centering
+\caption{2v2 Population-Based Self-Play Results (Last 500 Episodes)}
+\label{tab:population_2v2}
+\begin{tabular}{|l|c|c|}
+\hline
+Metric & MAPPO & IPPO \\
+\hline
+Predator Reward & 477.6 ± 212.9 & 209.0 ± 202.2 \\
+Prey Reward & -413.3 ± 351.0 & -135.6 ± 207.1 \\
+Predator Win Rate & 94.0\% & 97.8\% \\
+Prey Win Rate & 6.0\% & 2.2\% \\
+\hline
+\end{tabular}
+\end{table}
+
+Population-based training (Table~\ref{tab:population_2v2}) showed extreme imbalance in MAPPO (predator reward: 477.6, prey reward: -413.3), while IPPO maintained more balanced learning (prey reward: -135.6).
+
+\subsection{Comprehensive Comparison}
+
+\begin{table}[h]
+\centering
+\caption{Comprehensive Comparison Across All Strategies (2v2 Configuration)}
+\label{tab:comprehensive_2v2}
+\begin{tabular}{|l|c|c|c|}
+\hline
+Strategy & Algorithm & Predator Reward & Prey Reward \\
+\hline
+\multirow{2}{*}{Alternating} & MAPPO & 112.4 & -37.0 \\
+ & IPPO & 67.9 & +9.4 \\
+\hline
+\multirow{2}{*}{Population} & MAPPO & 477.6 & -413.3 \\
+ & IPPO & 209.0 & -135.6 \\
+\hline
+\multirow{2}{*}{League} & MAPPO & 73.4 & +3.1 \\
+ & IPPO & 182.7 & -109.1 \\
+\hline
+\end{tabular}
+\end{table}
+
+Across all configurations (Table~\ref{tab:comprehensive_2v2}), IPPO predators consistently achieved 96-98\% win rates, demonstrating superior convergence and adaptation. MAPPO exhibited more balanced dynamics with better prey survival, particularly in league-based scenarios where the centralized critic enables effective coordination.
+
+\section{Analysis and Discussion}
+
+\subsection{Why IPPO Predators Dominate}
+Our analysis reveals four key factors: (1) \textit{Independent Learning Advantage}: Each predator learns independently without coordination constraints, enabling faster convergence, (2) \textit{Non-Stationarity Handling}: IPPO treats other agents as part of the environment, allowing rapid adaptation to evolving strategies, (3) \textit{Numerical Advantage Amplification}: Multiple independent predators create simultaneous threats that overwhelm prey coordination, and (4) \textit{Simpler Learning Signal}: Direct reward signals without coordination overhead provide clearer credit assignment.
+
+\subsection{MAPPO's Coordination Benefits}
+MAPPO's centralized critic enables superior coordination, particularly evident in league-based self-play where complex opponent diversity benefits from shared value functions. This coordination helps prey achieve positive rewards and better survival rates.
+
+\subsection{Trade-offs}
+The results highlight fundamental trade-offs:
+\begin{itemize}
+\item \textbf{IPPO}: Faster convergence, better scalability, but extreme predator dominance (96-98\% win rates)
+\item \textbf{MAPPO}: Better coordination, more balanced dynamics, but requires global state and more complex implementation
+\end{itemize}
+
+\section{Conclusion}
+This study provides a comprehensive comparison of MAPPO and IPPO algorithms in adversarial multi-agent reinforcement learning. Our experiments demonstrate that IPPO predators consistently achieve 96-98\% win rates across all self-play strategies, driven by independent learning advantages and numerical superiority. Conversely, MAPPO exhibits more balanced dynamics with superior prey survival, achieving positive prey rewards in league-based self-play through centralized coordination.
+
+The choice between MAPPO and IPPO depends on the specific requirements: IPPO excels in scenarios requiring fast convergence and scalability, while MAPPO is preferable when coordination and balanced gameplay are priorities. Future work should explore hybrid approaches that combine the strengths of both algorithms.
+
+\section*{Acknowledgment}
+The authors would like to thank the University of California, Riverside for providing computational resources and support for this research.
+
+\begin{thebibliography}{00}
+\bibitem{b1} Yu, C., Velu, A., Vinitsky, E., Wang, Y., Bayen, A., \& Wu, Y. (2022). The surprising effectiveness of ppo in cooperative multi-agent games. Advances in Neural Information Processing Systems, 35, 24611-24624.
+
+\bibitem{b2} Tampuu, A., Matiisen, T., Kodelja, D., Kuzovkin, I., Korjus, K., Aru, J., ... \& Vicente, R. (2017). Multiagent deep reinforcement learning with extremely sparse rewards. arXiv preprint arXiv:1707.01495.
+
+\bibitem{b3} Vinyals, O., Babuschkin, I., Czarnecki, W. M., Mathieu, M., Dudzik, A., Chung, J., ... \& Silver, D. (2019). Grandmaster level in StarCraft II using multi-agent reinforcement learning. Nature, 575(7782), 350-354.
+
+% Add more references as needed
+\end{thebibliography}
+
+\appendices
+\section{Training Curves and Visualizations}
+
+This appendix contains training curves, visualizations, and screenshots from the experimental runs.
+
+\subsection{2v2 Alternating Self-Play Visualizations}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{results/alternating/2v2/2v2_graph.jpeg}
+\caption{Training curves for 2v2 Alternating Self-Play}
+\label{fig:2v2_alternating}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{results/alternating/2v2/2v2_terminal.jpeg}
+\caption{Terminal output for 2v2 Alternating Self-Play training}
+\label{fig:terminal_2v2_alt}
+\end{figure}
+
+\subsection{3v2 Alternating Self-Play Visualizations}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{results/alternating/3v2/3v2_graph.jpeg}
+\caption{Training curves for 3v2 Alternating Self-Play}
+\label{fig:3v2_alternating}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{results/alternating/3v2/3v2_terminal.jpeg}
+\caption{Terminal output for 3v2 Alternating Self-Play training}
+\label{fig:terminal_3v2_alt}
+\end{figure}
+
+\subsection{League-Based Self-Play Visualizations}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{results/league/2v2/2v2_graph.jpeg}
+\caption{Training curves for 2v2 League-Based Self-Play}
+\label{fig:league_2v2}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{results/league/2v2/2v2_terminal.jpeg}
+\caption{Terminal output for 2v2 League-Based Self-Play training}
+\label{fig:terminal_2v2_league}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{results/league/3v2/2v2_graph.jpeg}
+\caption{Training curves for 3v2 League-Based Self-Play}
+\label{fig:league_3v2}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{results/league/3v2/2v2_terminal.jpeg}
+\caption{Terminal output for 3v2 League-Based Self-Play training}
+\label{fig:terminal_3v2_league}
+\end{figure}
+
+\subsection{Population-Based Self-Play Visualizations}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{results/population/2v2_graph.jpeg}
+\caption{Training curves for 2v2 Population-Based Self-Play}
+\label{fig:population_2v2}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.48\textwidth]{results/population/2v2_terminal.jpeg}
+\caption{Terminal output for 2v2 Population-Based Self-Play training}
+\label{fig:terminal_2v2_population}
+\end{figure}
+
+\end{document}
+

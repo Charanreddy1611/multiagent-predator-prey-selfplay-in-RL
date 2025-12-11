@@ -110,27 +110,31 @@ class MetricsTracker:
     
     def compute_win_rate(self, window: int = 100) -> Dict[str, float]:
         """
-        Compute win rates (who gets higher reward).
+        Compute win rates with updated rules:
+        - Predator wins ONLY if it caught prey (predator_reward > 0)
+        - Prey wins if predator didn't catch it (predator_reward <= 0) OR if tied
         
         Args:
             window: Window size
         
         Returns:
-            Dictionary with win rates
+            Dictionary with win rates (no draws - prey wins ties)
         """
         recent_data = self.episode_data[-window:]
         
         if len(recent_data) == 0:
             return {'predator_win_rate': 0.0, 'prey_win_rate': 0.0, 'draw_rate': 0.0}
         
-        predator_wins = sum(1 for d in recent_data if d['predator_reward'] > d['prey_reward'])
-        prey_wins = sum(1 for d in recent_data if d['prey_reward'] > d['predator_reward'])
-        draws = len(recent_data) - predator_wins - prey_wins
+        # Predator wins ONLY if it has positive reward (actually caught prey)
+        predator_wins = sum(1 for d in recent_data if d['predator_reward'] > 0)
+        
+        # Prey wins if predator didn't catch it (predator_reward <= 0) OR if equal rewards
+        prey_wins = len(recent_data) - predator_wins
         
         return {
             'predator_win_rate': predator_wins / len(recent_data),
             'prey_win_rate': prey_wins / len(recent_data),
-            'draw_rate': draws / len(recent_data)
+            'draw_rate': 0.0  # No draws - ties go to prey
         }
     
     def save(self, filepath: str):

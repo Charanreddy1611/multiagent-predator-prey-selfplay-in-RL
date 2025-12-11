@@ -4,8 +4,8 @@ numpy>=1.24.0
 gymnasium>=0.29.0
 
 # Multi-Agent RL Environment
-pettingzoo>=1.24.0
-pygame>=2.1.0  # Required for PettingZoo rendering
+# pettingzoo>=1.24.0  # REMOVED: Now using custom environment
+# pygame>=2.1.0       # REMOVED: Using matplotlib for rendering instead
 
 # Visualization
 matplotlib>=3.7.0

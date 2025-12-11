@@ -16,19 +16,17 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
 # Virtual Environment
 venv/
-ENV/
 env/
+ENV/
 .venv
 
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
@@ -37,32 +35,30 @@ env/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-*.ipynb
 
-# Model checkpoints
-checkpoints/
-*.pt
+# PyTorch
 *.pth
-*.pkl
+*.pt
+*.ckpt
 
-# Logs and outputs
-logs/
-*.log
-tensorboard_logs/
-
-# Data
-data/
-*.csv
-*.json
+# Results and checkpoints (optional - uncomment if you don't want to track these)
+# results/
+# checkpoints/
+# comparison_results*/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Plots
-*.png
-*.jpg
-*.pdf
-plots/
-figures/
+# LaTeX
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+
+# Temporary files
+*.tmp
+*.bak
 

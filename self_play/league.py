@@ -80,18 +80,18 @@ class LeagueSelfPlay:
         
         # Initialize predator league
         self.predator_league = {
-            'main': [LeaguePlayer(copy.deepcopy(predator_agent), "main", gen=i) 
+            'main': [LeaguePlayer(copy.deepcopy(predator_agent), "main", generation=i) 
                     for i in range(n_main_agents)],
-            'exploiter': [LeaguePlayer(copy.deepcopy(predator_agent), "exploiter", gen=i)
+            'exploiter': [LeaguePlayer(copy.deepcopy(predator_agent), "exploiter", generation=i)
                          for i in range(n_exploiters)],
             'historical': deque(maxlen=historical_window)
         }
         
         # Initialize prey league
         self.prey_league = {
-            'main': [LeaguePlayer(copy.deepcopy(prey_agent), "main", gen=i)
+            'main': [LeaguePlayer(copy.deepcopy(prey_agent), "main", generation=i)
                     for i in range(n_main_agents)],
-            'exploiter': [LeaguePlayer(copy.deepcopy(prey_agent), "exploiter", gen=i)
+            'exploiter': [LeaguePlayer(copy.deepcopy(prey_agent), "exploiter", generation=i)
                          for i in range(n_exploiters)],
             'historical': deque(maxlen=historical_window)
         }
@@ -252,5 +252,27 @@ class LeagueSelfPlay:
                                  len(self.prey_league['main']),
             'current_predator_elo': self.current_predator.elo_rating,
             'current_prey_elo': self.current_prey.elo_rating
+        }
+    
+    def get_league_stats(self) -> Dict[str, Any]:
+        """Get league statistics (alias for compatibility)."""
+        # Calculate total league sizes
+        pred_league_size = (len(self.predator_league['main']) + 
+                           len(self.predator_league['exploiter']) + 
+                           len(self.predator_league['historical']))
+        
+        prey_league_size = (len(self.prey_league['main']) + 
+                           len(self.prey_league['exploiter']) + 
+                           len(self.prey_league['historical']))
+        
+        return {
+            'total_steps': self.steps,
+            'generation': self.generation,
+            'predator_league_size': pred_league_size,
+            'prey_league_size': prey_league_size,
+            'predator_main_avg_elo': sum(p.elo_rating for p in self.predator_league['main']) / 
+                                     len(self.predator_league['main']) if self.predator_league['main'] else 0,
+            'prey_main_avg_elo': sum(p.elo_rating for p in self.prey_league['main']) / 
+                                 len(self.prey_league['main']) if self.prey_league['main'] else 0,
         }
 
