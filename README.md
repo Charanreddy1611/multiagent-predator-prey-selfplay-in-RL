@@ -178,23 +178,13 @@ The project includes a complete IEEE format research paper template (`ieee_repor
 - Comprehensive results and analysis
 - Discussion of trade-offs between MAPPO and IPPO
 
-## 👥 Authors
 
-- **Charan Reddy Nandyala** (Lead Developer) - cnand002@ucr.edu
-- **Dhanush Chalicheemala** (Algorithm Implementation) - dchal007@ucr.edu
-- **Satyadev Gangineni** (Analysis & Visualization) - sgang024@ucr.edu
 
-University of California, Riverside  
-Advanced Machine Learning / Multi-Agent Systems  
-Fall 2024
 
 ## 📄 License
 
 This project is for educational and research purposes.
 
-## 🙏 Acknowledgments
-
-We thank the University of California, Riverside for providing computational resources and support for this research.
 
 ## 📚 References
 
@@ -211,5 +201,5 @@ This project extends research on:
 
 ---
 
-For questions or issues, please open an issue on GitHub or contact the authors.
+For questions or issues, please open an issue on GitHub.
 
